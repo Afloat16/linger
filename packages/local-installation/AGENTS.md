@@ -216,6 +216,8 @@ leaves the partial file intact for the next attempt.
 Move a freshly downloaded or unpacked file or folder into place with
 `renameRetrying` from `fs-retry.ts`: on Windows antivirus and indexing hold
 new files for a moment, and a plain rename then fails with EPERM.
+Cancellation is checked before every rename attempt, including after a
+retry wait, so a cancelled installation cannot publish the waiting file.
 
 Setting `LINGER_LOCALMODELS_DEV_PYTHON` and `LINGER_LOCALMODELS_DEV_MODULE_DIR`
 to absolute paths runs a local `localmodels` checkout instead of fetching the
