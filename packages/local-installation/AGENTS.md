@@ -36,7 +36,7 @@ voice key; without them, or when they fail to prepare, TeamHub gets
 setting tracks only the tools, so a key change never restarts them through
 it. A native process restarts when its generated environment changes.
 Generated native values preserve quoted paths and literal backslashes by
-checking their dotenv representation with the launcher's parser. Multiline,
+checking their complete dotenv file with the launcher's parser. Multiline,
 NUL-containing or otherwise unrepresentable values fail before publishing
 the environment file.
 Every port the installer chooses (`ports.ts`) must be free on both
