@@ -25,6 +25,9 @@ An idle desktop-owned manager steps aside when the desktop relaunches the same
 instance with another checkout. Every installation runs natively from the
 source checkout `--source-repo` names. Start failures print their real cause
 on stderr for the desktop to show.
+Native sign-in sessions belong to an instance and its selected runtime. A changed
+setup choice must not reuse another runtime's URL or accept a code for its process;
+starting sign-in for the new runtime stops the previous runtime's pending login.
 
 `--resume` (native source with `--instance`) starts an installed instance's
 stopped services headless, reusing its saved choices; the desktop client runs it
