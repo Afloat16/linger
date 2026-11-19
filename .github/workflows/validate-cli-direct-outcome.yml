@@ -1,0 +1,73 @@
+name: Validate direct CLI write outcomes
+
+on:
+  push:
+    branches:
+      - validation/cli-direct-write-outcome-20261120
+
+permissions:
+  contents: read
+
+jobs:
+  cli:
+    if: github.repository == 'Afloat16/linger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 40b8d7322a61f9e82ffe193f61b19ad04bc61a33
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Assert exact source revision
+        run: test "$(git rev-parse HEAD)" = "40b8d7322a61f9e82ffe193f61b19ad04bc61a33"
+      - name: Verify changed TypeScript formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(apps/teamhub-cli/src/http-client.ts apps/teamhub-cli/src/http-client.test.ts apps/teamhub-cli/src/message-send-executor.test.ts)
+          if ! pnpm exec prettier --check "${files[@]}"; then
+            pnpm exec prettier --write "${files[@]}"
+            git diff -- "${files[@]}"
+            exit 1
+          fi
+      - name: Reproduce direct transport and message failures without the follow-up
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 9575a1e24ecbc26398c62137d3092b10c2cd8ac7
+          git show 9575a1e24ecbc26398c62137d3092b10c2cd8ac7:apps/teamhub-cli/src/http-client.ts > apps/teamhub-cli/src/http-client.ts
+          status=0
+          pnpm --filter @linger/teamhub-cli test src/http-client.test.ts src/message-send-executor.test.ts --reporter=json --outputFile="$RUNNER_TEMP/cli-direct-outcome-baseline.json" || status=$?
+          git restore --source=40b8d7322a61f9e82ffe193f61b19ad04bc61a33 -- apps/teamhub-cli/src/http-client.ts
+          test "$status" -ne 0
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/cli-direct-outcome-baseline.json", "utf8"));
+          const failures = report.testResults.flatMap((result) => result.assertionResults).filter((result) => result.status === "failed");
+          const direct = failures.filter((result) => result.fullName.includes("request writes retains the write operation ID"));
+          const message = failures.filter((result) => result.fullName.includes("retains the operation ID when a successful message response is unreadable"));
+          if (report.numFailedTests !== 5 || report.numPassedTests !== 21 || direct.length !== 4 || message.length !== 1) {
+            throw new Error("Expected exactly four direct transport regressions and the message executor regression to fail");
+          }
+          console.log("Baseline reproduced: five direct-write regressions fail and 21 controls pass.");
+          for (const result of failures) console.log(result.fullName, result.failureMessages.join("\n"));
+          NODE
+      - name: Focused transport and real message executor suites
+        run: pnpm --filter @linger/teamhub-cli test src/http-client.test.ts src/message-send-executor.test.ts
+      - name: All selected fast checks
+        run: make check BASE=cd0e23af6cacbca311bfe1964e11ea6c73cc7562
+      - name: Repository contribution gate
+        run: make check-repository-gate BASE=cd0e23af6cacbca311bfe1964e11ea6c73cc7562
+      - name: Source remains unchanged
+        if: always()
+        run: |
+          git diff --check
+          git diff --exit-code
