@@ -89,13 +89,8 @@ export function createTeamHubClient(
         method,
         outcome: "failure",
       });
-      throw new CliError(
-        operationId ? "outcome_unknown" : "connection_failed",
-        operationId
-          ? "The operation outcome is unknown. Retry with --operation-id set to this Operation ID."
-          : "Could not reach TeamHub.",
-        operationId ? { operation_id: operationId } : {},
-      );
+      if (operationId) throw unknownWriteOutcome(operationId);
+      throw new CliError("connection_failed", "Could not reach TeamHub.");
     }
     if (timing) {
       const returnedId = response.headers.get("x-request-id");
@@ -161,16 +156,31 @@ export function createTeamHubClient(
         ...(call.body ? { body: await call.text() } : {}),
       });
       if (response.status === 204) return response;
-      const value = await readJson(response);
-      if (!record(value))
-        throw new CliError(
-          "invalid_response",
-          "TeamHub returned an invalid JSON response.",
-        );
+      let value: unknown;
+      try {
+        value = await readJson(response);
+        if (!record(value))
+          throw new CliError(
+            "invalid_response",
+            "TeamHub returned an invalid JSON response.",
+          );
+      } catch (error) {
+        const operationId = call.headers.get("x-teamhub-operation-id");
+        if (operationId) throw unknownWriteOutcome(operationId);
+        throw error;
+      }
       return Response.json(value, { status: response.status });
     },
   });
   return { config, api, request };
+}
+
+function unknownWriteOutcome(operationId: string): CliError {
+  return new CliError(
+    "outcome_unknown",
+    "The operation outcome is unknown. Retry with --operation-id set to this Operation ID.",
+    { operation_id: operationId },
+  );
 }
 
 function timedResponse(

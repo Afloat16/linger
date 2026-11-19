@@ -74,6 +74,74 @@ describe("direct TeamHub HTTP client", () => {
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it.each([
+    {
+      name: "interrupted body",
+      response: () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.error(new Error("response body disconnected"));
+            },
+          }),
+          { status: 201 },
+        ),
+    },
+    {
+      name: "truncated JSON",
+      response: () => new Response('{"accepted":', { status: 201 }),
+    },
+    {
+      name: "unexpected JSON shape",
+      response: () => Response.json([], { status: 201 }),
+    },
+    {
+      name: "oversized body",
+      response: () =>
+        new Response(new Uint8Array(8 * 1024 * 1024 + 1), { status: 201 }),
+    },
+  ])(
+    "retains the write operation ID after a successful status with $name",
+    async ({ response }) => {
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response());
+      const client = createTeamHubClient(config, { fetch: fetcher });
+      await expect(
+        client.api.POST("/api/agent/v1/direct-messages", {
+          body: {} as never,
+          headers: operationHeaders("stable-reply"),
+        }),
+      ).rejects.toMatchObject({
+        code: "outcome_unknown",
+        details: { operation_id: "stable-reply" },
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("keeps malformed read responses as invalid responses", async () => {
+    const client = createTeamHubClient(config, {
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response("{")),
+    });
+    await expect(
+      client.api.GET("/api/agent/v1/files", {
+        params: { query: { after_id: "", limit: 100 } },
+      }),
+    ).rejects.toMatchObject({ code: "invalid_response", details: {} });
+  });
+  it("accepts a successful write with no response body", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const client = createTeamHubClient(config, { fetch: fetcher });
+    expect(
+      await teamHubData(
+        client.api.POST("/api/agent/v1/direct-messages", {
+          body: {} as never,
+          headers: operationHeaders("stable-reply"),
+        }),
+      ),
+    ).toEqual({});
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it("preserves structured TeamHub permission and conflict errors", async () => {
     const client = createTeamHubClient(config, {
       fetch: vi.fn<typeof fetch>().mockResolvedValue(
@@ -90,10 +158,16 @@ describe("direct TeamHub HTTP client", () => {
       ),
     });
     await expect(
-      client.api.POST("/api/agent/v1/documents", { body: {} as never }),
+      client.api.POST("/api/agent/v1/documents", {
+        body: {} as never,
+        headers: operationHeaders("stable-document"),
+      }),
     ).rejects.toMatchObject({
       code: "version_conflict",
-      details: { current_version_id: "v2" },
+      details: {
+        current_version_id: "v2",
+        operation_id: "stable-document",
+      },
     });
   });
   it("sends configured identity assertions and the Run to the credential authority and keeps shared links anonymous", async () => {
