@@ -30,7 +30,7 @@ Each instance directory holds `user.env` (0600), the only file a person edits:
 (`user-environment.ts`). Every mode merges it into the generated
 `compose.env` / `native.env` over a developer checkout's `.env` and under the
 installer's own values; other names are ignored with a warning, and the file
-is created from a template once and never rewritten. The desktop source
+is created from a template once; ordinary reads never rewrite it. The desktop source
 package's `.env` is not read. Voice keys are normally saved in the app
 (TeamHub); a key in `user.env` overrides it. Whenever the distribution has
 voice tools for this computer, Native prepares them and runs LiveKit with
@@ -39,6 +39,14 @@ voice key; without them, or when they fail to prepare, TeamHub gets
 `TEAMHUB_VOICE_MEDIA=off` and the install continues. The services' `voice`
 setting tracks only the tools, so a key change never restarts them through
 it. A native process restarts when its generated environment changes.
+
+Adopting a legacy environment keeps nonempty values already set in `user.env`.
+Adoption and saved key updates recognize plain, exported and whitespace-formatted
+assignments through the same helper. Each changed key replaces its first assignment
+in place and removes later duplicates, or is appended once when absent. This keeps
+values beside their template comments without duplicate secret values. The legacy
+file is removed only after the private atomic write completes.
+
 Generated native values preserve quoted paths and literal backslashes by
 checking their complete dotenv file with the launcher's parser. Multiline,
 NUL-containing or otherwise unrepresentable values fail before publishing
