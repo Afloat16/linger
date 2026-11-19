@@ -11,6 +11,10 @@ stop unrelated processes, pull mutable images, or delete volumes as recovery.
 Every installation runs natively from a Linger source checkout; Docker is not
 used.
 
+`atomicPrivate` closes and removes its temporary file on failed writes or
+syncs as well as failed publication. A failed replacement keeps the previous
+private file available, without leaving partial configuration copies behind.
+
 The account file records provisioning history, not current database readiness
 or a promise that its saved password is still current. On HTTP 401, the existing
 idempotent owner command establishes whether this email owns the deployment and
