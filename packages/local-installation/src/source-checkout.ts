@@ -337,9 +337,14 @@ export async function prepareSourceConfiguration(
       ),
     };
     const quote = (value: string) => {
-      if (/[\r\n\0']/.test(value))
-        throw new Error("Source environment contains unsupported characters.");
-      return `'${value}'`;
+      if (!/[\r\n\0]/.test(value)) {
+        // Match the launcher's parser, including literal Windows backslashes.
+        for (const delimiter of ["'", "`", '"', ""]) {
+          const quoted = `${delimiter}${value}${delimiter}`;
+          if (parseEnv(`VALUE=${quoted}`).VALUE === value) return quoted;
+        }
+      }
+      throw new Error("Source environment contains unsupported characters.");
     };
     const nativeFileOmissions = new Set([
       "WEB_HTTP_PORT",

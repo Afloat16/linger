@@ -91,6 +91,58 @@ test("native checkout identities are stable", async () => {
     await readFile(path.join(first.instance.root, "native.env"), "utf8"),
   ).toBe(text);
 });
+
+test.each(["O'Neil", "O'Neil`files"])(
+  "native environments preserve paths below %s",
+  async (directory) => {
+    const f = await fixture();
+    const native = await prepareNativeConfiguration(f.repo, {
+      home: path.join(f.home, directory),
+      name: "quoted-home",
+    });
+    const persisted = parseEnv(
+      await readFile(path.join(native.instance.root, "native.env"), "utf8"),
+    );
+    for (const key of [
+      "TEAMHUB_ARTIFACT_STORAGE_ROOT",
+      "AGENT_HOME",
+      "COMPUTER_RELEASE_DIR",
+    ]) {
+      expect(native.env[key]).toContain(directory);
+      expect(persisted[key]).toBe(native.env[key]);
+    }
+  },
+);
+
+test("native environment quoting preserves literal Windows backslashes", async () => {
+  const f = await fixture();
+  const value = String.raw`C:\new\O'Neil\linger`;
+  await writeFile(path.join(f.repo, ".env"), `FIXTURE_PATH=\`${value}\`\n`);
+  const native = await prepareNativeConfiguration(f.repo, {
+    home: f.home,
+    name: "quoted-value",
+  });
+  const persisted = parseEnv(
+    await readFile(path.join(native.instance.root, "native.env"), "utf8"),
+  );
+  expect(native.env.FIXTURE_PATH).toBe(value);
+  expect(persisted.FIXTURE_PATH).toBe(value);
+});
+
+test("native environments still reject multiline values without publishing them", async () => {
+  const f = await fixture();
+  await writeFile(path.join(f.repo, ".env"), "FIXTURE_VALUE='line\nbreak'\n");
+  await expect(
+    prepareNativeConfiguration(f.repo, {
+      home: f.home,
+      name: "multiline-value",
+    }),
+  ).rejects.toThrow("Source environment contains unsupported characters.");
+  await expect(
+    readFile(path.join(f.home, "instances/multiline-value/native.env")),
+  ).rejects.toMatchObject({ code: "ENOENT" });
+});
+
 test("native environment checks do not require or report Docker", async () => {
   const f = await fixture();
   const report = await checkNativeSourceEnvironment({
