@@ -1095,7 +1095,9 @@ export class LocalServerModule implements Module {
         .prewarmAssets(job.origin);
       // The desktop's Computer runs the runtime this installer set up, with
       // its profile, rather than whatever its PATH finds.
-      const runtime = await installer.runtime();
+      const runtime = await this.#timed("installer_runtime", () =>
+        installer.runtime(signal),
+      );
       const preferredRuntime = setupRuntime(runtime.setupChoice);
       this.#ctx?.config.update({
         runtimeEnvironment: runtime.environment,
@@ -1200,7 +1202,7 @@ export class LocalServerModule implements Module {
     signal: AbortSignal,
   ): Promise<LocalRuntime | { readonly byok: SetupByokConfig } | undefined> {
     const runtime =
-      setupRuntime((await installer.runtime()).setupChoice) ?? "pi";
+      setupRuntime((await installer.runtime(signal)).setupChoice) ?? "pi";
     this.#signInInstaller = installer;
     this.#switchTo = undefined;
     this.#switchByok = undefined;
@@ -2938,6 +2940,9 @@ export interface Reconnect {
 }
 
 const RECONNECT: Reconnect = { windowMs: 60_000, maxBackoffMs: 5_000 };
+// The runtime lookup runs a 120-second harness probe, with private file and
+// pinned tool checks before and after it.
+const INSTALLER_RUNTIME_TIMEOUT_MS = 180_000;
 
 const TRANSIENT_CODES = new Set([
   "ECONNRESET",
@@ -3213,8 +3218,25 @@ export class InstallerApi {
 
   // The runtime the installation set up, with the paths of its executable
   // and profile.
-  runtime(): Promise<InstanceRuntime> {
-    return this.#json(`/api/instances/${LOCAL_INSTANCE}/runtime`);
+  async runtime(signal: AbortSignal): Promise<InstanceRuntime> {
+    const deadline = AbortSignal.timeout(INSTALLER_RUNTIME_TIMEOUT_MS);
+    try {
+      return await this.#json(
+        `/api/instances/${LOCAL_INSTANCE}/runtime`,
+        undefined,
+        "GET",
+        AbortSignal.any([signal, deadline]),
+      );
+    } catch (error) {
+      if (!signal.aborted && deadline.aborted)
+        throw new Error(
+          "The installer timed out while reading the selected runtime.",
+          {
+            cause: error,
+          },
+        );
+      throw error;
+    }
   }
 
   // The runtime's sign-in: checks it, or with `start` begins the runtime's
@@ -3240,6 +3262,7 @@ export class InstallerApi {
     pathname: string,
     body?: unknown,
     method = body === undefined ? "GET" : "POST",
+    signal = AbortSignal.timeout(60_000),
   ): Promise<Response> {
     return this.#fetch(new URL(pathname, this.#origin), {
       method,
@@ -3251,7 +3274,7 @@ export class InstallerApi {
         ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
       redirect: "error",
-      signal: AbortSignal.timeout(60_000),
+      signal,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   }
@@ -3260,8 +3283,9 @@ export class InstallerApi {
     pathname: string,
     body?: unknown,
     method?: string,
+    signal?: AbortSignal,
   ): Promise<T> {
-    const response = await this.#call(pathname, body, method);
+    const response = await this.#call(pathname, body, method, signal);
     if (!response.ok) {
       const error = (await response.json().catch(() => null)) as {
         message?: string;
