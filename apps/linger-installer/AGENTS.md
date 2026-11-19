@@ -13,6 +13,11 @@ instance mutations remain locked, and cancellation retains account/data/device.
 Native sign-in cancellation and manager shutdown invalidate pending runtime
 inspections before they can launch a login process; a newer explicit start owns
 the instance's pending inspection.
+A queued job is busy while its initial private files are being saved. Canceling
+it prevents execution after those writes, and shutdown drains that initial save
+before returning, just as it waits for an executing job. An initial input-save
+failure is reported by start without interrupting shutdown's remaining cleanup;
+storage failures for retained jobs still propagate.
 A start returns the instance's running or queued job; a job that finished its
 run and waits for the person (`waiting_user`, e.g. `LOCAL_MODELS_UNAVAILABLE`)
 is canceled and replaced, so Try Again checks the computer again.
