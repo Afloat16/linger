@@ -195,6 +195,71 @@ it("preserves filesystem failures outside the transport boundary", async () => {
   expect(await readdir(root)).toEqual([]);
 });
 
+it.each([false, true])(
+  "cancels a blocked response body without waiting for the idle timeout (resumable: %s)",
+  async (resumable) => {
+    const root = await mkdtemp(path.join(tmpdir(), "linger-download-"));
+    roots.push(root);
+    const abort = new AbortController();
+    const reason = new Error("Installation cancelled.");
+    const bytes = Buffer.from("trusted bytes that have not all arrived");
+    const prefix = bytes.subarray(0, 7);
+    const output = path.join(root, "kit.tgz");
+    let calls = 0;
+    let cancelled = false;
+    let forceEnd: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await expect(
+        downloadVerified(
+          {
+            url: "https://primary.example/kit.tgz",
+            mirrors: ["https://mirror.example/kit.tgz"],
+            output,
+            digest: createHash("sha256").update(bytes).digest("hex"),
+            algorithm: "sha256",
+            maxBytes: 100,
+            signal: abort.signal,
+            resumable,
+          },
+          async () => {
+            calls++;
+            let pulls = 0;
+            return new Response(
+              new ReadableStream<Uint8Array>(
+                {
+                  start(controller) {
+                    // Bound the fixture even when cancellation is ignored.
+                    forceEnd = setTimeout(() => controller.close(), 1_000);
+                  },
+                  pull(controller) {
+                    if (pulls++ === 0) controller.enqueue(prefix);
+                    else {
+                      abort.abort(reason);
+                      return new Promise(() => {});
+                    }
+                  },
+                  cancel() {
+                    cancelled = true;
+                  },
+                },
+                { highWaterMark: 0 },
+              ),
+            );
+          },
+          { ...fast, idleTimeoutMs: 60_000 },
+        ),
+      ).rejects.toBe(reason);
+      expect(cancelled).toBe(true);
+      expect(calls).toBe(1);
+      await expect(access(output)).rejects.toThrow();
+      expect(await readdir(root)).toEqual(resumable ? ["kit.tgz.part"] : []);
+      if (resumable) expect(await readFile(`${output}.part`)).toEqual(prefix);
+    } finally {
+      clearTimeout(forceEnd);
+    }
+  },
+);
+
 it("resumes an interrupted transfer with a range request", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "linger-download-"));
   roots.push(root);

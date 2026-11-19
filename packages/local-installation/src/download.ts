@@ -89,6 +89,7 @@ export async function downloadVerified(
   // failure, "next" when this host cannot serve the file.
   const attempt = async (url: URL): Promise<"done" | "retry" | "next"> => {
     const stalled = new AbortController();
+    const signal = AbortSignal.any([options.signal, stalled.signal]);
     let idle: NodeJS.Timeout | undefined;
     const watch = () => {
       clearTimeout(idle);
@@ -100,7 +101,7 @@ export async function downloadVerified(
       try {
         response = await fetcher(url, {
           redirect: "error",
-          signal: AbortSignal.any([options.signal, stalled.signal]),
+          signal,
           ...(completed ? { headers: { range: `bytes=${completed}-` } } : {}),
         });
       } catch {
@@ -147,16 +148,19 @@ export async function downloadVerified(
         throw new Error("Download size exceeds limit.");
       }
       const reader = response.body.getReader();
-      // Some bodies ignore the abort signal, so a stall also ends the read.
-      const stall = new Promise<never>((_resolve, reject) =>
-        stalled.signal.addEventListener("abort", () => reject(new Error())),
-      );
-      stall.catch(() => {});
+      // Some bodies ignore the fetch signal; either abort still ends the read.
+      let abortRead: (() => void) | undefined;
+      const interrupted = new Promise<never>((_resolve, reject) => {
+        abortRead = () => reject(signal.reason);
+        if (signal.aborted) abortRead();
+        else signal.addEventListener("abort", abortRead, { once: true });
+      });
+      interrupted.catch(() => {});
       try {
         for (;;) {
           let chunk: Awaited<ReturnType<typeof reader.read>>;
           try {
-            chunk = await Promise.race([reader.read(), stall]);
+            chunk = await Promise.race([reader.read(), interrupted]);
           } catch {
             options.signal.throwIfAborted();
             failure = stalled.signal.aborted ? "stalled" : "interrupted";
@@ -176,6 +180,7 @@ export async function downloadVerified(
           }
         }
       } finally {
+        if (abortRead) signal.removeEventListener("abort", abortRead);
         await reader.cancel().catch(() => {});
       }
     } finally {

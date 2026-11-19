@@ -176,6 +176,11 @@ registry probe, and a fallback to the other region rewrites the file. The
 resolved region reaches every `localmodels` child and native service as
 `SIMPLEX_REGION`. The contract is in `scripts/installs/README.md`.
 
+Verified downloads stop reading on explicit cancellation even when a response
+body ignores the fetch signal. They retain the caller's abort reason, cancel
+the reader and keep only resumable partial bytes; cancellation never waits
+for the idle timeout or moves on to another mirror.
+
 Move a freshly downloaded or unpacked file or folder into place with
 `renameRetrying` from `fs-retry.ts`: on Windows antivirus and indexing hold
 new files for a moment, and a plain rename then fails with EPERM.
