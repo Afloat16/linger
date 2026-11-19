@@ -129,6 +129,46 @@ test("native environment quoting preserves literal Windows backslashes", async (
   expect(persisted.FIXTURE_PATH).toBe(value);
 });
 
+test("native environments reject a value that would consume the next key", async () => {
+  const f = await fixture();
+  const options = { home: f.home, name: "cross-entry-value" };
+  const native = await prepareNativeConfiguration(f.repo, options);
+  const envFile = path.join(native.instance.root, "native.env");
+  const before = await readFile(envFile, "utf8");
+  const value = "'`=a\\n#\\";
+  // As the last entry this is readable, but writing another quoted entry
+  // after it can close its leading quote and absorb the following key.
+  const supplied = `CONTROL=kept\nFIXTURE_VALUE=${value}\n`;
+  expect(parseEnv(supplied)).toEqual({ CONTROL: "kept", FIXTURE_VALUE: value });
+  await writeFile(path.join(f.repo, ".env"), supplied);
+
+  await expect(prepareNativeConfiguration(f.repo, options)).rejects.toThrow(
+    "Source environment contains unsupported characters.",
+  );
+  expect(await readFile(envFile, "utf8")).toBe(before);
+});
+
+test.each(["'quoted", '"quoted', "`quoted"])(
+  "native environments preserve a representable leading quote in %s",
+  async (value) => {
+    const f = await fixture();
+    const delimiter = value.startsWith("'") ? '"' : "'";
+    await writeFile(
+      path.join(f.repo, ".env"),
+      `FIXTURE_VALUE=${delimiter}${value}${delimiter}\nFOLLOWING=kept\n`,
+    );
+    const native = await prepareNativeConfiguration(f.repo, {
+      home: f.home,
+      name: "leading-quote",
+    });
+    const persisted = parseEnv(
+      await readFile(path.join(native.instance.root, "native.env"), "utf8"),
+    );
+    expect(persisted.FIXTURE_VALUE).toBe(value);
+    expect(persisted.FOLLOWING).toBe("kept");
+  },
+);
+
 test("native environments still reject multiline values without publishing them", async () => {
   const f = await fixture();
   await writeFile(path.join(f.repo, ".env"), "FIXTURE_VALUE='line\nbreak'\n");

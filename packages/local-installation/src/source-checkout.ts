@@ -354,13 +354,17 @@ export async function prepareSourceConfiguration(
       "HOST",
       "LOCAL_ENV_FILE",
     ]);
-    await atomicPrivate(
-      envFile,
-      Object.entries(generated)
-        .filter(([key]) => !nativeFileOmissions.has(key))
-        .map(([key, value]) => `${key}=${quote(value)}`)
-        .join("\n") + "\n",
+    const entries = Object.entries(generated).filter(
+      ([key]) => !nativeFileOmissions.has(key),
     );
+    const text =
+      entries.map(([key, value]) => `${key}=${quote(value)}`).join("\n") + "\n";
+    // An unmatched leading quote can consume a later entry, even if the
+    // isolated value round-trips. Validate exactly what the launcher reads.
+    const parsed = parseEnv(text);
+    if (entries.some(([key, value]) => parsed[key] !== value))
+      throw new Error("Source environment contains unsupported characters.");
+    await atomicPrivate(envFile, text);
     return { instance, env: generated, warnings };
   });
 }
