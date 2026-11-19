@@ -190,6 +190,11 @@ Rebuilding the checksum of a saved resumable partial also uses the caller's
 signal, so cancellation stops local reads before another request starts and
 leaves the partial file intact for the next attempt.
 
+A completed download with the wrong trusted checksum discards its assembled
+bytes before trying another mirror. A resumed prefix may itself be stale, so
+the current host remains eligible for a fresh request within the existing
+retry limit. No invalid assembly is published or retained as a resumable file.
+
 Move a freshly downloaded or unpacked file or folder into place with
 `renameRetrying` from `fs-retry.ts`: on Windows antivirus and indexing hold
 new files for a moment, and a plain rename then fails with EPERM.

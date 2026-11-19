@@ -115,7 +115,7 @@ export async function downloadVerified(
     } else await rm(partial, { recursive: true, force: true });
   }
   options.signal.throwIfAborted();
-  const handle = await open(partial, options.resumable ? "a" : "ax", 0o600);
+  let handle = await open(partial, options.resumable ? "a" : "ax", 0o600);
   let size: number | undefined;
   let lastProgressAt = 0;
   let failure = "no connection";
@@ -331,7 +331,24 @@ export async function downloadVerified(
             }
           }
         }
+        const resumed = completed > 0;
         const outcome = await attempt(url, slowLimit);
+        if (outcome.status === "done") {
+          options.signal.throwIfAborted();
+          if (hash.copy().digest("hex") !== options.digest) {
+            // A mirror must start fresh after an invalid assembled download.
+            // A resumed prefix may be stale, so give this host a fresh retry.
+            completed = 0;
+            // Recreate it because Windows append handles cannot truncate.
+            await handle.close();
+            await rm(partial, { force: true });
+            handle = await open(partial, "ax", 0o600);
+            hash = createHash(options.algorithm);
+            size = undefined;
+            failure = "checksum mismatch";
+            outcome.status = resumed ? "retry" : "next";
+          }
+        }
         result = outcome.status;
         served = url;
         if (outcome.status === "done") break rounds;

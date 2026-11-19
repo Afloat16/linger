@@ -1,6 +1,13 @@
 import { afterEach, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, access, readdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rm,
+  access,
+  readdir,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { downloadVerified } from "./download.js";
@@ -50,6 +57,99 @@ it("a bad checksum never publishes an executable archive", async () => {
     ),
   ).rejects.toThrow(/checksum/i);
   await expect(access(output)).rejects.toThrow();
+});
+
+it.each(["sha256", "sha512"] as const)(
+  "restarts from a mirror when the primary's completed archive fails %s",
+  async (algorithm) => {
+    const root = await mkdtemp(path.join(tmpdir(), "linger-download-"));
+    roots.push(root);
+    const bytes = Buffer.from("trusted mirror fixture");
+    const output = path.join(root, "kit.tgz");
+    const requests: string[] = [];
+    const served = await downloadVerified(
+      {
+        url: "https://primary.example/kit.tgz",
+        mirrors: ["https://mirror.example/kit.tgz"],
+        output,
+        algorithm,
+        digest: createHash(algorithm).update(bytes).digest("hex"),
+        maxBytes: bytes.length,
+        signal: new AbortController().signal,
+      },
+      async (url, init) => {
+        const host = new URL(url instanceof Request ? url.url : url).host;
+        requests.push(`${host} ${new Headers(init?.headers).get("range")}`);
+        return new Response(
+          host === "primary.example" ? Buffer.alloc(bytes.length, 120) : bytes,
+        );
+      },
+      fast,
+    );
+    expect(served).toBe("https://mirror.example/kit.tgz");
+    expect(requests).toEqual(["primary.example null", "mirror.example null"]);
+    expect(await readFile(output)).toEqual(bytes);
+    expect(await readdir(root)).toEqual(["kit.tgz"]);
+  },
+);
+
+it("restarts a corrupt complete partial after the server returns 416", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "linger-download-"));
+  roots.push(root);
+  const bytes = Buffer.from("trusted retry fixture");
+  const output = path.join(root, "kit.tgz");
+  await writeFile(`${output}.part`, Buffer.alloc(bytes.length, 120));
+  const ranges: Array<string | null> = [];
+  await downloadVerified(
+    {
+      url: "https://primary.example/kit.tgz",
+      output,
+      algorithm: "sha256",
+      digest: createHash("sha256").update(bytes).digest("hex"),
+      maxBytes: bytes.length,
+      resumable: true,
+      signal: new AbortController().signal,
+    },
+    async (_url, init) => {
+      const range = new Headers(init?.headers).get("range");
+      ranges.push(range);
+      return range ? new Response(null, { status: 416 }) : new Response(bytes);
+    },
+    fast,
+  );
+  expect(ranges).toEqual([`bytes=${bytes.length}-`, null]);
+  expect(await readFile(output)).toEqual(bytes);
+  expect(await readdir(root)).toEqual(["kit.tgz"]);
+});
+
+it("tries each corrupt host once without replacing an existing published file", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "linger-download-"));
+  roots.push(root);
+  const output = path.join(root, "kit.tgz");
+  await writeFile(output, "previous installation");
+  const hosts: string[] = [];
+  await expect(
+    downloadVerified(
+      {
+        url: "https://primary.example/kit.tgz",
+        mirrors: ["https://mirror.example/kit.tgz"],
+        output,
+        algorithm: "sha256",
+        digest: "0".repeat(64),
+        maxBytes: 100,
+        resumable: true,
+        signal: new AbortController().signal,
+      },
+      async (url) => {
+        hosts.push(new URL(url instanceof Request ? url.url : url).host);
+        return new Response("wrong");
+      },
+      fast,
+    ),
+  ).rejects.toThrow(/checksum/i);
+  expect(hosts).toEqual(["primary.example", "mirror.example"]);
+  expect(await readFile(output, "utf8")).toBe("previous installation");
+  expect(await readdir(root)).toEqual(["kit.tgz"]);
 });
 it("rejects HTTP, credential-bearing URLs, and downloads over the size bound", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "linger-download-"));
