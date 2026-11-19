@@ -46,7 +46,9 @@ the environment file.
 Every port the installer chooses (`ports.ts`) must be free on both
 127.0.0.1 and ::1 with nothing answering there: `localhost` resolves to ::1
 first on macOS, and a program on ::1 alone would answer for a service that
-bound 127.0.0.1 without an error. The web static host listens on both. Each
+bound 127.0.0.1 without an error. The web static host listens on both.
+Creating an instance also reserves other instances' saved LiveKit HTTP and RTC
+ports, even while their voice services are stopped. Each
 start re-checks a stopped service's ports and moves one another program took
 to a free port, persisted in `instance.json` or `livekit.env`, so the service
 restarts with the new environment. The web port is the product origin
