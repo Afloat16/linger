@@ -184,6 +184,12 @@ under a lease no record holds, once its environment proves that lease; an
 attempt that failed or was killed before keeping a record would otherwise
 leave PostgreSQL holding `postmaster.pid` against every retry.
 
+Native runtime and localmodels kit verification (`native-runtime.ts` and
+`localmodels-tool.ts`) stop assigning files on the first mismatch and wait
+for every active verification worker to finish before reporting failure.
+Recovery moves or removes an invalid runtime or kit only after those
+workers have released their file handles.
+
 Every download offered by both a global host and a mainland-China mirror
 goes through `downloadInRegion` (`region.ts`), which tries the home's
 download region first and never drops a source; the region is
