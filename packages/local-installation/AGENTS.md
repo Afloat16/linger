@@ -128,6 +128,9 @@ that check and the quit-time stop share one lock per home
 (`withLocalModelsLock`); the check waits up to 180 s for it, past the stop's
 150 s hard exit, then asks to try again.
 
+`runProcess` decodes stdout and stderr as separate UTF-8 streams before
+capture and output callbacks, preserving characters split across pipe reads.
+
 Each native service runs under a detached supervisor
 (`native-process-worker.mjs`) whose record holds its PID, birth and an
 unguessable lease. POSIX finds the service's processes by process group and
