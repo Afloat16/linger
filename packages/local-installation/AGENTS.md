@@ -95,6 +95,11 @@ never leaves a directory that later attempts treat as initialized. A `postgres-d
 `PG_VERSION` but no `postmaster.opts` (which only a started server writes)
 never served a connection, holds no data, and is initialized again.
 
+The desktop's bundled TeamHub binaries (`teamhub-binaries.ts`) count as current
+only when their files still match the manifest's sizes and hashes. A missing
+or damaged installed file is copied again from the bundle, so Native can use
+the verified binaries without downloading Go and compiling from source.
+
 Every Linger release creates TeamHub's schema from the 852 baseline
 migration, which refuses a database that already holds one. A database from
 the desktop app before the rename has `public.accounts` but no applied 852
