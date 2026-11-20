@@ -237,7 +237,7 @@ function delimitedToMarkdown(text: string, delimiter: string): string {
   if (rows.length === 0) {
     throw new DocumentNormalizationError("DOCUMENT_SOURCE_EMPTY");
   }
-  const width = Math.max(...rows.map((row) => row.length));
+  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
   const padded = rows.map((row) =>
     Array.from({ length: width }, (_, index) =>
       (row[index] ?? "").replaceAll("\n", " ").replaceAll("|", "\\|"),

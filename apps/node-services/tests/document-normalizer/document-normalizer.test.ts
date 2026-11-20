@@ -14,6 +14,7 @@ import {
   DocumentNormalizationError,
   DOCX_MEDIA_TYPE,
   GZIP_MEDIA_TYPE,
+  MAX_DOCUMENT_MARKDOWN_BYTES,
   MAX_DOCUMENT_SOURCE_BYTES,
   PDF_MEDIA_TYPE,
   PNG_MEDIA_TYPE,
@@ -258,6 +259,39 @@ describe("document normalization", () => {
         source: encode("# Notes\n"),
       }).then(decode),
     ).resolves.toBe("# Notes\n");
+  });
+
+  it.each([
+    ["text/csv", ","],
+    ["text/tab-separated-values", "\t"],
+  ])(
+    "normalizes large delimited documents within the byte limits: %s",
+    async (mediaType, delimiter) => {
+      const rows = 200_000;
+      const source = encode(
+        `name${delimiter}count\n${`item${delimiter}1\n`.repeat(rows)}`,
+      );
+      const expected = `| name | count |\n| --- | --- |\n${"| item | 1 |\n".repeat(rows)}`;
+      expect(source.byteLength).toBeLessThan(MAX_DOCUMENT_SOURCE_BYTES);
+      expect(encode(expected).byteLength).toBeLessThan(
+        MAX_DOCUMENT_MARKDOWN_BYTES,
+      );
+      await expect(
+        normalizeDocumentContent({ mediaType, source }).then(decode),
+      ).resolves.toBe(expected);
+    },
+  );
+
+  it("keeps the Markdown size error for a large delimited document", async () => {
+    await expect(
+      normalizeDocumentContent(
+        {
+          mediaType: "text/csv",
+          source: encode(`name,count\n${"item,1\n".repeat(200_000)}`),
+        },
+        1024,
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_MARKDOWN_TOO_LARGE" });
   });
 
   it("normalizes LF and one trailing newline and enforces output size", () => {

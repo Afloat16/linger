@@ -99,6 +99,12 @@
   focused work; `NODE_SERVICES_ROLES=agent` (or another role) narrows it.
 - Memory CLIs: `pnpm --filter @linger/node-services memory:<command>`.
 
+## Large text documents
+
+CSV and TSV normalization accepts large row counts within the existing source
+and Markdown byte limits. An output that exceeds its configured byte budget
+fails with `DOCUMENT_MARKDOWN_TOO_LARGE`, independently of the number of rows.
+
 ## Image
 
 - The `Dockerfile` builds one image that runs every role: port 4319 for the
