@@ -43,6 +43,13 @@
   and the host passes it to the agent role only when both run in the same
   process; the Agent calls it directly, not over HTTP.
 
+## Text document conversion
+
+Imported code, JSON, XML and YAML remain literal code-block content in the
+normalized Markdown. Embedded backtick runs must not close the surrounding
+fence, and filename-derived language metadata must not introduce backticks or
+line breaks into its opening line.
+
 ## Configuration and Paths
 
 - Roles read only the process environment. Package scripts load the root `.env`

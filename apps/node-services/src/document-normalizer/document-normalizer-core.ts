@@ -311,5 +311,11 @@ function jsonToMarkdown(text: string): string {
 
 function fencedBlock(language: string, body: string): string {
   const normalized = body.replace(/^\uFEFF/u, "").replace(/\n+$/u, "");
-  return `\`\`\`${language}\n${normalized}\n\`\`\``;
+  let fenceLength = 3;
+  for (const run of normalized.matchAll(/`+/gu)) {
+    fenceLength = Math.max(fenceLength, run[0].length + 1);
+  }
+  const fence = "`".repeat(fenceLength);
+  const info = /^[^`\r\n]*$/u.test(language) ? language : "text";
+  return `${fence}${info}\n${normalized}\n${fence}`;
 }
