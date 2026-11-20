@@ -155,6 +155,8 @@ Core configuration:
 - Business dates use the process's local time zone (`TZ`): the collection window, Session dates, meeting
   directories, Pocket Note reads and calendar scheduling all use it, and there is no separate time zone variable.
   Compose containers default to UTC; set `TZ` in `.env` when needed.
+  Explicit dates must name an actual calendar day in `YYYY-MM-DD` form. Invalid `--date` and
+  `--week-start` values are rejected before collection instead of being normalized to another day.
 - These features are always on, with no switch: the in-process scheduled sync (hourly Wiki, daily Daily and weekly
   Weekly), the targeted refresh after a Room is quiet for 10 minutes, the separate Session refresh of formal
   recording transcripts, Session fact extraction and fact recall, the nightly tracking-item pass, and the nightly
