@@ -85,6 +85,16 @@
 - `scripts/generate-feature-catalog.ts` generates
   `src/agent/agent-features/catalog.generated.ts`; `typecheck` verifies it.
 
+## JSON document conversion
+
+JSON imports validate and pretty-print the source while retaining each numeric
+literal. The converter uses Node's source-aware JSON reviver and raw JSON values
+so large identifiers, precise decimals and extreme exponents are not rounded or
+replaced with `null`. JSON conversion uses the normalizer's queued worker so
+per-value revival does not block the shared Node Services event loop, and it
+obeys the worker's cancellation, memory and timeout limits. UTF-8 validation
+is unchanged. Invalid JSON remains `DOCUMENT_SOURCE_INVALID`.
+
 ## Commands
 
 - `pnpm --filter @linger/node-services check`: typecheck and lint

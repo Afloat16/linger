@@ -28,7 +28,7 @@ export type DocumentSourceKind =
   | "svg"
   | "unsupported";
 
-const IN_PROCESS_DOCUMENT_SOURCE_KINDS = new Set<DocumentSourceKind>([
+const TEXT_DOCUMENT_SOURCE_KINDS = new Set<DocumentSourceKind>([
   "markdown",
   "plain",
   "html",
@@ -269,7 +269,9 @@ export function isInProcessDocumentSource(
     "filename" | "mediaType" | "representationFormat"
   >,
 ): boolean {
-  return IN_PROCESS_DOCUMENT_SOURCE_KINDS.has(resolveDocumentSourceKind(input));
+  const kind = resolveDocumentSourceKind(input);
+  // Source-aware JSON revival visits every value and can block shared roles.
+  return kind !== "json" && TEXT_DOCUMENT_SOURCE_KINDS.has(kind);
 }
 
 export function codeFenceLanguage(filename: string | undefined): string {
@@ -334,7 +336,7 @@ function assertCompatibleCharset(
   kind: DocumentSourceKind,
   parameters: readonly string[],
 ): void {
-  if (!IN_PROCESS_DOCUMENT_SOURCE_KINDS.has(kind)) return;
+  if (!TEXT_DOCUMENT_SOURCE_KINDS.has(kind)) return;
   if (
     parameters.some(
       (parameter) =>
