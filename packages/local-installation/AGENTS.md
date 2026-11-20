@@ -145,6 +145,8 @@ that check and the quit-time stop share one lock per home
 
 `runProcess` decodes stdout and stderr as separate UTF-8 streams before
 capture and output callbacks, preserving characters split across pipe reads.
+An output callback failure stops the owned command and rejects its promise
+after the process closes; later output is not delivered to a failed callback.
 
 Each native service runs under a detached supervisor
 (`native-process-worker.mjs`) whose record holds its PID, birth and an
