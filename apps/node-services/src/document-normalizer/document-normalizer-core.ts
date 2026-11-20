@@ -303,7 +303,18 @@ function parseDelimitedRows(text: string, delimiter: string): string[][] {
 
 function jsonToMarkdown(text: string): string {
   try {
-    return fencedBlock("json", JSON.stringify(JSON.parse(text), null, 2));
+    // Node 26 provides raw JSON values; the project's ES2022 types omit them.
+    const json = JSON as typeof JSON & {
+      rawJSON(source: string): unknown;
+    };
+    const parsed: unknown = JSON.parse(
+      text,
+      (_key: string, value: unknown, context?: { source?: string }): unknown =>
+        typeof value === "number" && context?.source !== undefined
+          ? json.rawJSON(context.source)
+          : value,
+    );
+    return fencedBlock("json", JSON.stringify(parsed, null, 2));
   } catch {
     throw new DocumentNormalizationError("DOCUMENT_SOURCE_INVALID");
   }
