@@ -220,6 +220,8 @@ for the idle timeout or moves on to another mirror.
 Rebuilding the checksum of a saved resumable partial also uses the caller's
 signal, so cancellation stops local reads before another request starts and
 leaves the partial file intact for the next attempt.
+If that saved file already matches the trusted checksum, publish it without
+another network request; the usual cancellation and atomic-rename checks still apply.
 
 Move a freshly downloaded or unpacked file or folder into place with
 `renameRetrying` from `fs-retry.ts`: on Windows antivirus and indexing hold
