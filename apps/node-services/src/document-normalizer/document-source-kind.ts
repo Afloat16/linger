@@ -1,3 +1,5 @@
+import { MIMEType } from "node:util";
+
 import {
   DocumentNormalizationError,
   type DocumentNormalizationInput,
@@ -243,21 +245,21 @@ export function resolveDocumentSourceKind(
       const officeKind = zipDocumentKind(input);
       if (officeKind) return officeKind;
     }
-    assertCompatibleCharset(fromMedia, parsed.parameters);
+    assertCompatibleCharset(fromMedia, parsed.charset);
     return fromMedia;
   }
   const fromName = kindFromFilename(input.filename);
   if (fromName) {
-    assertCompatibleCharset(fromName, parsed.parameters);
+    assertCompatibleCharset(fromName, parsed.charset);
     return fromName;
   }
   const fromFormat = kindFromRepresentation(input.representationFormat);
   if (fromFormat) {
-    assertCompatibleCharset(fromFormat, parsed.parameters);
+    assertCompatibleCharset(fromFormat, parsed.charset);
     return fromFormat;
   }
   if (parsed.essence.startsWith("text/")) {
-    assertCompatibleCharset("plain", parsed.parameters);
+    assertCompatibleCharset("plain", parsed.charset);
     return "plain";
   }
   return "unsupported";
@@ -321,25 +323,29 @@ function kindFromRepresentation(
 
 function parseMediaType(value: string): {
   essence: string;
-  parameters: string[];
+  charset: string | null;
 } {
-  const parts = value
-    .split(";")
-    .map((part) => part.trim().toLocaleLowerCase("en-US"))
-    .filter((part) => part.length > 0);
-  return { essence: parts.shift() ?? "", parameters: parts };
+  const separator = value.indexOf(";");
+  const essence = (separator < 0 ? value : value.slice(0, separator))
+    .trim()
+    .toLocaleLowerCase("en-US");
+  // Parse parameters independently so an absent or generic essence can still
+  // fall back to the filename or representation format.
+  const parameters = separator < 0 ? "" : value.slice(separator);
+  const charset = new MIMEType(
+    `application/octet-stream${parameters}`,
+  ).params.get("charset");
+  return { essence, charset };
 }
 
 function assertCompatibleCharset(
   kind: DocumentSourceKind,
-  parameters: readonly string[],
+  charset: string | null,
 ): void {
   if (!IN_PROCESS_DOCUMENT_SOURCE_KINDS.has(kind)) return;
   if (
-    parameters.some(
-      (parameter) =>
-        parameter !== "charset=utf-8" && parameter !== "charset=utf8",
-    )
+    charset !== null &&
+    !["utf-8", "utf8"].includes(charset.toLocaleLowerCase("en-US"))
   ) {
     throw new DocumentNormalizationError("DOCUMENT_SOURCE_UNSUPPORTED");
   }
