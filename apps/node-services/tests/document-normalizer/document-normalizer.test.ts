@@ -123,6 +123,45 @@ describe("document normalization", () => {
     );
   });
 
+  it.each([
+    'text/csv; header=present; charset="UTF-8"',
+    'application/octet-stream; charset="utf8"',
+    'application/vnd.example.table; profile="https://example.test/schema; charset=windows-1252"; charset=utf-8',
+  ])("normalizes UTF-8 CSV with MIME parameters: %s", async (mediaType) => {
+    const input = {
+      filename: "people.csv",
+      mediaType,
+      source: encode("name,count\nCaf\u00e9,42\n"),
+    };
+    expect(isInProcessDocumentSource(input)).toBe(true);
+    await expect(normalizeDocumentContent(input).then(decode)).resolves.toBe(
+      "| name | count |\n| --- | --- |\n| Caf\u00e9 | 42 |\n",
+    );
+  });
+
+  it.each([
+    'text/csv; header=present; charset="windows-1252"',
+    'application/octet-stream; charset="UTF-16"',
+  ])("still rejects unsupported declared encodings: %s", async (mediaType) => {
+    await expect(
+      normalizeDocumentContent({
+        filename: "people.csv",
+        mediaType,
+        source: encode("name,count\nAda,42\n"),
+      }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_SOURCE_UNSUPPORTED" });
+  });
+
+  it("still validates text bytes when an accepted charset is quoted", async () => {
+    await expect(
+      normalizeDocumentContent({
+        filename: "notes.txt",
+        mediaType: 'text/plain; charset="utf-8"',
+        source: new Uint8Array([0x63, 0x61, 0x66, 0xe9]),
+      }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_SOURCE_INVALID" });
+  });
+
   it("extracts archive and SVG text and reads no raster image", async () => {
     await expect(
       normalizeDocumentContent({
