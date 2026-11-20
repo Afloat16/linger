@@ -73,6 +73,10 @@
 
 ## Structure
 
+- MIME document normalization prefers extractable HTML, then the recorded
+  plain-text alternative when HTML has no extractable body. Headers alone do
+  not make an empty message indexable.
+
 - `tests/<role>/` mirrors `src/<role>/`; host-level tests such as
   `tests/main.test.ts` and `tests/http-host.test.ts` stay flat under `tests/`.
 - Role-specific rules live in `src/agent/AGENTS.md`, `src/llm-wiki/AGENTS.md`,
