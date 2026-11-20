@@ -90,6 +90,7 @@ export async function extractOfficeMarkdown(
     ast.metadata = {};
     return (
       await ast.to("md", {
+        generateIds: kind !== "html",
         includeImages: "none",
         mdConfig: { dialect: "github", fallbackToHtml: false },
       })
