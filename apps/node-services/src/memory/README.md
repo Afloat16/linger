@@ -12,6 +12,12 @@ output schema and write validation use the same scope. The file system still pro
 `timeline/weekly/`; the current version in PostgreSQL is the query authority. Period reports are read through the
 Memory browsing entry and do not enter OpenWiki's native graph.
 
+When reading existing Markdown, metadata parsing first tries the recorded YAML
+and then the repair for unquoted colon-bearing values. If neither parses, the
+reader uses the body heading and summary with empty metadata. A damaged report
+therefore remains readable without blocking other reports in the Memory browser;
+the reader does not rewrite the file. Publication validation remains strict.
+
 ## Search
 
 Memory keeps one index, `memory_index.sources` and `chunks`: Room Sessions, recordings, My pages, imported
