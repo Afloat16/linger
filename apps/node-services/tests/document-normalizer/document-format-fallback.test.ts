@@ -34,6 +34,21 @@ it.each(["constructor", "__proto__"])(
   },
 );
 
+it.each(["constructor", "__proto__"])(
+  "keeps .%s literal in the fence of a declared code source",
+  async (extension) => {
+    const bytes = await normalizeDocumentContent({
+      filename: `snippet.${extension}`,
+      mediaType: "text/javascript",
+      source: Buffer.from("const answer = 42;"),
+    });
+
+    expect(Buffer.from(bytes).toString()).toBe(
+      `\`\`\`${extension}\nconst answer = 42;\n\`\`\`\n`,
+    );
+  },
+);
+
 it("keeps recognized MIME and filename precedence", () => {
   expect(
     resolveDocumentSourceKind({
