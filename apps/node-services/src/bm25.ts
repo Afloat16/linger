@@ -15,7 +15,10 @@ export function searchBm25<T>(
       const previous = frequencies.get(token) ?? 0;
       frequencies.set(token, previous + 1);
       if (previous === 0)
-        documentFrequencies.set(token, (documentFrequencies.get(token) ?? 0) + 1);
+        documentFrequencies.set(
+          token,
+          (documentFrequencies.get(token) ?? 0) + 1,
+        );
     }
     return { ...document, frequencies, length: tokens.length };
   });
