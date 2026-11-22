@@ -171,11 +171,12 @@ it("bounds parallel image reads, deduplicates sources, and waits for in-flight r
   expect(active).toBe(0);
 });
 
-
 it.each(["local image", "document source"])(
   "rejects cancellation during the final %s read",
   async (kind) => {
-    const sourceContent = Buffer.from("![chart](data:image/gif;base64,R0lGODlh)\n");
+    const sourceContent = Buffer.from(
+      "![chart](data:image/gif;base64,R0lGODlh)\n",
+    );
     const source = {
       filePath: "source.md",
       content: sourceContent,
@@ -187,19 +188,38 @@ it.each(["local image", "document source"])(
         ? "![chart](chart.gif)\n"
         : prepareDocumentSource(source).markdown,
     );
-    const snapshot = { filePath: "report.md", content, sizeBytes: content.length, sha256: "" };
+    const snapshot = {
+      filePath: "report.md",
+      content,
+      sizeBytes: content.length,
+      sha256: "",
+    };
     const controller = new AbortController();
     const reason = new Error("send cancelled");
     let release!: () => void;
-    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     let entered!: () => void;
-    const started = new Promise<void>((resolve) => { entered = resolve; });
-    const bundled = bundleDocumentImages(snapshot, async (filePath) => {
-      entered();
-      await pending;
-      const bytes = kind === "local image" ? Buffer.from("GIF89a") : sourceContent;
-      return { filePath, content: bytes, sizeBytes: bytes.length, sha256: "" };
-    }, controller.signal);
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const bundled = bundleDocumentImages(
+      snapshot,
+      async (filePath) => {
+        entered();
+        await pending;
+        const bytes =
+          kind === "local image" ? Buffer.from("GIF89a") : sourceContent;
+        return {
+          filePath,
+          content: bytes,
+          sizeBytes: bytes.length,
+          sha256: "",
+        };
+      },
+      controller.signal,
+    );
     await started;
     controller.abort(reason);
     release();
@@ -209,7 +229,20 @@ it.each(["local image", "document source"])(
 
 it("honors an already cancelled Markdown bundle without images", async () => {
   const content = Buffer.from("# Notes\n");
-  const snapshot = { filePath: "report.md", content, sizeBytes: content.length, sha256: "" };
+  const snapshot = {
+    filePath: "report.md",
+    content,
+    sizeBytes: content.length,
+    sha256: "",
+  };
   const reason = new Error("send cancelled");
-  await expect(bundleDocumentImages(snapshot, async () => { throw new Error("unexpected read"); }, AbortSignal.abort(reason))).rejects.toBe(reason);
+  await expect(
+    bundleDocumentImages(
+      snapshot,
+      async () => {
+        throw new Error("unexpected read");
+      },
+      AbortSignal.abort(reason),
+    ),
+  ).rejects.toBe(reason);
 });
