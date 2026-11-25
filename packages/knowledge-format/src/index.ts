@@ -105,11 +105,15 @@ export function setOkfRootIndexVersion(content: string): string {
     return `---\nokf_version: "${OKF_VERSION}"\n---\n\n${content.replace(/^\s+/u, "")}`;
   }
   const block = match[1] ?? "";
-  const document = parseDocument(repairOkfFrontmatter(block), {
+  const repaired = repairOkfFrontmatter(block);
+  const document = parseDocument(repaired, {
     schema: "core",
     uniqueKeys: true,
   });
   if (document.errors.length === 0 && isMap(document.contents)) {
+    if (repaired === block && document.get("okf_version") === OKF_VERSION) {
+      return content;
+    }
     document.set("okf_version", OKF_VERSION);
     return `---\n${document.toString().trimEnd()}\n---\n${content.slice(match[0].length)}`;
   }

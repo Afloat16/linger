@@ -9,6 +9,43 @@ import {
 
 describe("validateOkfDocument", () => {
   it.each([
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+  ])(
+    "keeps an already-current root index byte-for-byte with %s",
+    (_label, newline) => {
+      const description =
+        "Keep this detailed description on its original plain line. "
+          .repeat(3)
+          .trim();
+      const content = [
+        "---",
+        "\"okf_version\": '0.2' # current format",
+        `description: ${description}`,
+        "tags: [a, b]",
+        "---",
+        "",
+        "# Index",
+        "",
+        "Keep the Markdown body exactly.",
+        "",
+      ].join(newline);
+
+      expect(setOkfRootIndexVersion(content)).toBe(content);
+    },
+  );
+
+  it("still repairs current-version frontmatter that needs normalization", () => {
+    const body = "\n# Index\n\nKeep this body exactly.\n";
+    const content = `---\nokf_version: "0.2"\ntitle: Index: details\n---\n${body}`;
+    const updated = setOkfRootIndexVersion(content);
+
+    expect(updated).toContain('title: "Index: details"');
+    expect(normalizeOkfMarkdown(updated)).toBe(updated);
+    expect(updated.endsWith(body)).toBe(true);
+  });
+
+  it.each([
     "okf_version: >-\n  0.1",
     '"okf_version": "0.1"',
     'okf_version: "0.\n  1"',

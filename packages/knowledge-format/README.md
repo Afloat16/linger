@@ -4,6 +4,8 @@ Knowledge Format provides shared YAML-based parsing and serialization helpers fo
 
 Root-index version updates address the YAML field, including quoted keys, flow
 maps and multiline values. They retain other metadata values and the Markdown
-body when setting `okf_version`.
+body when setting `okf_version`. Valid frontmatter with the current string
+version is left byte-for-byte unchanged; frontmatter that needs normalization
+is still repaired.
 
 The package has no AGENTS.md of its own; commands are the `scripts` in `package.json`, and general conventions are in the root [AGENTS.md](../../AGENTS.md).
