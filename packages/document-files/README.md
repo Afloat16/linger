@@ -11,3 +11,6 @@ The package has no AGENTS.md of its own; commands are the `scripts` in `package.
 `rewriteMarkdownLinkSources` applies a source rewrite only to parsed inline link
 ranges. It preserves code, escaped link syntax, image-only nodes and all text
 outside those ranges without serializing the Markdown tree.
+The callback receives the parsed URL and the label end relative to the link
+source, so callers can keep label and title punctuation separate. A leading
+byte-order mark is retained and accounted for in the source ranges.

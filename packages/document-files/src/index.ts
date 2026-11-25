@@ -79,18 +79,30 @@ function* markdownNodes(tree: Tree): Generator<MarkdownNode> {
 /** Rewrite only actual inline link source ranges, preserving every surrounding Markdown byte. */
 export function rewriteMarkdownLinkSources(
   markdown: string,
-  rewrite: (linkSource: string) => string,
+  rewrite: (
+    linkSource: string,
+    link: { url: string; labelEnd: number },
+  ) => string,
 ): string {
   const parts: string[] = [];
+  const bomOffset = markdown.startsWith("\uFEFF") ? 1 : 0;
   let offset = 0;
   for (const node of markdownNodes(processor.parse(markdown))) {
     if (node.type !== "link") continue;
-    const start = node.position?.start.offset;
-    const end = node.position?.end.offset;
-    if (start === undefined || end === undefined || start < offset) continue;
+    const nodeStart = node.position?.start.offset;
+    const nodeEnd = node.position?.end.offset;
+    if (nodeStart === undefined || nodeEnd === undefined) continue;
+    const start = nodeStart + bomOffset;
+    const end = nodeEnd + bomOffset;
+    if (start < offset) continue;
     parts.push(
       markdown.slice(offset, start),
-      rewrite(markdown.slice(start, end)),
+      rewrite(markdown.slice(start, end), {
+        url: node.url!,
+        labelEnd:
+          (node.children?.at(-1)?.position?.end.offset ?? nodeStart + 1) -
+          nodeStart,
+      }),
     );
     offset = end;
   }

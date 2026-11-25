@@ -22,19 +22,33 @@ const literalCases = [
   name: name!,
   literal: literal!,
   expected: literal!,
+  prefix: "",
 }));
 literalCases.push({
   name: "code inside a link label",
   literal: "[`[Example](target.md)`](target.md)",
   expected: "[`[Example](target.md)`](Target.md)",
+  prefix: "",
+});
+literalCases.push({
+  name: "link-like punctuation inside a title",
+  literal: '[Example](target.md "x ](y")',
+  expected: '[Example](Target.md "x ](y")',
+  prefix: "",
+});
+literalCases.push({
+  name: "a leading byte-order mark",
+  literal: "[Example](target.md)",
+  expected: "[Example](Target.md)",
+  prefix: "\uFEFF\n",
 });
 
 it.each(literalCases)(
   "keeps $name literal while publishing real links",
-  async ({ literal, expected }) => {
+  async ({ literal, expected, prefix }) => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "published-links-"));
     roots.push(root);
-    const content = `# Guide\n\n${literal}\n\n[Actual](target.md#details "Title")\n`;
+    const content = `${prefix}# Guide\n\n${literal}\n\n[Actual](target.md#details "Title")\n`;
     await publishMemoryWiki(
       root,
       "alice",
