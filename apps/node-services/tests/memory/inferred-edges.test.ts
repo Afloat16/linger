@@ -190,25 +190,25 @@ describe("mention edges", () => {
     ]);
   });
 
-  it.each([
-    "\u041f\u0420\u041e\u0415\u041a\u0422",
-    "\u0623\u062d\u0645\u062f",
-  ])("keeps distinctive or uncased one-word aliases: %s", (alias) => {
-    const edges = mentionEdges(
-      [
-        node("projects/research", "Research Pilot"),
-        node(
-          "sessions/2026-10-03/meeting",
-          "Meeting",
-          `${alias} approved the prototype.`,
-        ),
-      ],
-      new Map([["projects/research", [alias]]]),
-    );
-    expect(edges).toEqual([
-      expect.objectContaining({ target: "projects/research", count: 1 }),
-    ]);
-  });
+  it.each(["\u041f\u0420\u041e\u0415\u041a\u0422", "\u0623\u062d\u0645\u062f"])(
+    "keeps distinctive or uncased one-word aliases: %s",
+    (alias) => {
+      const edges = mentionEdges(
+        [
+          node("projects/research", "Research Pilot"),
+          node(
+            "sessions/2026-10-03/meeting",
+            "Meeting",
+            `${alias} approved the prototype.`,
+          ),
+        ],
+        new Map([["projects/research", [alias]]]),
+      );
+      expect(edges).toEqual([
+        expect.objectContaining({ target: "projects/research", count: 1 }),
+      ]);
+    },
+  );
 });
 
 describe("graph build with inferred edges", () => {
