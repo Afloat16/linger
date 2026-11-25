@@ -166,6 +166,49 @@ describe("mention edges", () => {
       first.find((edge) => edge.target === target)!.weight;
     expect(weight("clients/orion")).toBeGreaterThan(weight("clients/acme"));
   });
+
+  it.each([
+    "\u041f\u0440\u043e\u0435\u043a\u0442",
+    "\u043f\u0440\u043e\u0435\u043a\u0442",
+    "\u03a3\u03c7\u03ad\u03b4\u03b9\u03bf",
+    "\u03c3\u03c7\u03ad\u03b4\u03b9\u03bf",
+  ])("ignores ordinary one-word aliases in cased scripts: %s", (alias) => {
+    const edges = mentionEdges(
+      [
+        node("projects/research", "Research Pilot"),
+        node("clients/epic", "Epic"),
+        node(
+          "sessions/2026-10-03/meeting",
+          "Meeting",
+          `${alias} needs work. Epic signed.`,
+        ),
+      ],
+      new Map([["projects/research", [alias]]]),
+    );
+    expect(edges).toEqual([
+      expect.objectContaining({ target: "clients/epic", count: 1 }),
+    ]);
+  });
+
+  it.each([
+    "\u041f\u0420\u041e\u0415\u041a\u0422",
+    "\u0623\u062d\u0645\u062f",
+  ])("keeps distinctive or uncased one-word aliases: %s", (alias) => {
+    const edges = mentionEdges(
+      [
+        node("projects/research", "Research Pilot"),
+        node(
+          "sessions/2026-10-03/meeting",
+          "Meeting",
+          `${alias} approved the prototype.`,
+        ),
+      ],
+      new Map([["projects/research", [alias]]]),
+    );
+    expect(edges).toEqual([
+      expect.objectContaining({ target: "projects/research", count: 1 }),
+    ]);
+  });
 });
 
 describe("graph build with inferred edges", () => {

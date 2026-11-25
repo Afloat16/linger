@@ -14,9 +14,12 @@ Memory browsing entry and do not enter OpenWiki's native graph.
 
 ## Search
 
-Entity-name specificity counts Unicode letters and digits, so accented names
-and names in non-Latin scripts can participate in mention edges and flashback
-recall. Existing short-name, case and ambiguous-name filters still apply.
+Entity-name specificity counts Unicode letters and digits toward the existing
+minimum of four letters or digits for names without Han. This admits qualifying
+accented Latin, Cyrillic and Arabic names; it does not lower the threshold for
+short Hangul or kana names. Names containing Han keep their existing
+two-character minimum. Plain-word aliases in scripts with letter case, one-word
+case matching and ambiguous-name filters still apply.
 
 Memory keeps one index, `memory_index.sources` and `chunks`: Room Sessions, recordings, My pages, imported
 mail, Pocket Notes, the Profile, the published Wiki pages (`wiki`) and the Daily and Weekly reports
