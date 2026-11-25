@@ -144,6 +144,24 @@ function splitOversizedBlock(
   while (start < block.end) {
     let end = Math.min(block.end, start + MAX_CHUNK_CHARS);
     if (
+      tokenizeSearchText(content.slice(start, end)).length > MAX_CHUNK_TOKENS
+    ) {
+      let low = start + 1;
+      let high = end;
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        if (
+          tokenizeSearchText(content.slice(start, middle)).length <=
+          MAX_CHUNK_TOKENS
+        ) {
+          low = middle;
+        } else {
+          high = middle - 1;
+        }
+      }
+      end = low;
+    }
+    if (
       end < block.end &&
       content.charCodeAt(end - 1) >= 0xd800 &&
       content.charCodeAt(end - 1) <= 0xdbff
@@ -152,7 +170,11 @@ function splitOversizedBlock(
     }
     ranges.push({ start, end, headingPath: block.headingPath });
     if (end === block.end) break;
-    start = Math.max(start + 1, end - OVERSIZED_BLOCK_OVERLAP_CHARS);
+    const overlap = Math.min(
+      OVERSIZED_BLOCK_OVERLAP_CHARS,
+      Math.floor((end - start) / 2),
+    );
+    start = Math.max(start + 1, end - overlap);
     if (
       content.charCodeAt(start) >= 0xdc00 &&
       content.charCodeAt(start) <= 0xdfff
