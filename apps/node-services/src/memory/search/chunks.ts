@@ -141,26 +141,39 @@ function splitOversizedBlock(
 ): SourceBlock[] {
   const ranges: SourceBlock[] = [];
   let start = block.start;
+  // Nearby cuts seed the search without imposing a smaller character limit.
+  let previousLength = MAX_CHUNK_CHARS;
   while (start < block.end) {
-    let end = Math.min(block.end, start + MAX_CHUNK_CHARS);
+    const limit = Math.min(block.end, start + MAX_CHUNK_CHARS);
+    let end = Math.min(limit, start + previousLength);
+    let low = start + 1;
     if (
-      tokenizeSearchText(content.slice(start, end)).length > MAX_CHUNK_TOKENS
+      tokenizeSearchText(content.slice(start, end)).length <= MAX_CHUNK_TOKENS
     ) {
-      let low = start + 1;
-      let high = end;
-      while (low < high) {
-        const middle = Math.ceil((low + high) / 2);
+      low = end;
+      for (let step = 1; end < limit; step *= 2) {
+        end = Math.min(limit, end + step);
         if (
-          tokenizeSearchText(content.slice(start, middle)).length <=
+          tokenizeSearchText(content.slice(start, end)).length >
           MAX_CHUNK_TOKENS
-        ) {
-          low = middle;
-        } else {
-          high = middle - 1;
-        }
+        )
+          break;
+        low = end;
       }
-      end = low;
     }
+    let high = end - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (
+        tokenizeSearchText(content.slice(start, middle)).length <=
+        MAX_CHUNK_TOKENS
+      ) {
+        low = middle;
+      } else {
+        high = middle - 1;
+      }
+    }
+    end = low;
     if (
       end < block.end &&
       content.charCodeAt(end - 1) >= 0xd800 &&
@@ -168,6 +181,7 @@ function splitOversizedBlock(
     ) {
       end -= 1;
     }
+    previousLength = end - start;
     ranges.push({ start, end, headingPath: block.headingPath });
     if (end === block.end) break;
     const overlap = Math.min(
